@@ -1,6 +1,7 @@
 # Publica uma versão do Aurion: um push num branch upload/** com a pasta upload/
 # (arquivos divididos em partes .partNNN + latest.json + SHA256SUMS + NOTES.md)
-# vira uma release com os arquivos inteiros. O branch é apagado no final.
+# vira uma release com os arquivos inteiros. Pode mandar as partes em vários pushes:
+# enquanto faltar parte, o workflow só espera. O branch é apagado no final.
 name: Publicar versão
 on:
   push:
@@ -13,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Juntar as partes, conferir e publicar
+        id: pub
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -25,7 +27,11 @@ jobs:
             cat "$name".part* > "../out/$name"
           done
           cp latest.json ../out/
-          (cd ../out && sha256sum -c ../upload/SHA256SUMS)
+          if ! (cd ../out && sha256sum -c --quiet ../upload/SHA256SUMS); then
+            echo "Ainda faltam partes; esperando o próximo envio."; exit 0
+          fi
           gh release create "v$VERSION" ../out/* --title "Aurion $VERSION" --notes-file NOTES.md --latest
+          echo "done=1" >> "$GITHUB_OUTPUT"
       - name: Apagar o branch de envio
+        if: steps.pub.outputs.done == '1'
         run: git push origin --delete "$GITHUB_REF_NAME"
