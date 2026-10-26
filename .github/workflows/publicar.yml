@@ -1,0 +1,31 @@
+# Publica uma versão do Aurion: um push num branch upload/** com a pasta upload/
+# (arquivos divididos em partes .partNNN + latest.json + SHA256SUMS + NOTES.md)
+# vira uma release com os arquivos inteiros. O branch é apagado no final.
+name: Publicar versão
+on:
+  push:
+    branches: ['upload/**']
+permissions:
+  contents: write
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Juntar as partes, conferir e publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd upload
+          VERSION=$(jq -r .version latest.json)
+          mkdir ../out
+          for first in *.part000; do
+            name="${first%.part000}"
+            cat "$name".part* > "../out/$name"
+          done
+          cp latest.json ../out/
+          (cd ../out && sha256sum -c ../upload/SHA256SUMS)
+          gh release create "v$VERSION" ../out/* --title "Aurion $VERSION" --notes-file NOTES.md --latest
+      - name: Apagar o branch de envio
+        run: git push origin --delete "$GITHUB_REF_NAME"
