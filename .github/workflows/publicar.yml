@@ -21,6 +21,7 @@ jobs:
           set -euo pipefail
           cd upload
           VERSION=$(jq -r .version latest.json)
+          TAG="v$VERSION"; [ -f TAG ] && TAG=$(tr -d '[:space:]' < TAG)
           mkdir ../out
           for first in *.part000; do
             name="${first%.part000}"
@@ -30,7 +31,7 @@ jobs:
           if ! (cd ../out && sha256sum -c --quiet ../upload/SHA256SUMS); then
             echo "Ainda faltam partes; esperando o próximo envio."; exit 0
           fi
-          gh release create "v$VERSION" ../out/* --title "Aurion $VERSION" --notes-file NOTES.md --latest
+          gh release create "$TAG" ../out/* --title "Aurion $TAG" --notes-file NOTES.md --latest
           echo "done=1" >> "$GITHUB_OUTPUT"
       - name: Apagar o branch de envio
         if: steps.pub.outputs.done == '1'
